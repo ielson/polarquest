@@ -1,0 +1,22 @@
+services:
+  noetic:
+    build: 
+      context: .
+      args:
+        USERNAME: "ielson"
+        USER_UID: "1000"
+        USER_GID: "1000"
+    container_name: noetic-dev
+    environment:
+      # sharing display and gpu
+      - DISPLAY=${DISPLAY}
+      - QT_X11_NO_MITSHM=1
+      - __GLX_VENDOR_LIBRARY_NAME=nvidia
+      - NVIDIA_VISIBLE_DEVICES=all
+      - NVIDIA_DRIVER_CAPABILITIES=graphics,utility,compute
+    volumes:
+      - /tmp/.X11-unix:/tmp/.X11-unix:rw
+      - ${HOME}/code/polarquest/ws:/home/${USER}/code/polarquest/ws
+    gpus: all
+    network_mode: "host"
+    command: bash -lc "tail -f /dev/null"
