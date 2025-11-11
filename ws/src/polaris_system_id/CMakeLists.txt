@@ -11,6 +11,9 @@ find_package(catkin REQUIRED COMPONENTS
   roscpp
   rospy
   std_msgs
+  ackermann_msgs
+  tf
+  visualization_msgs
 )
 
 ## System dependencies are found with CMake's conventions
@@ -209,5 +212,21 @@ include_directories(
 #target_link_libraries(talker ${catkin_LIBRARIES})
 
 catkin_install_python(PROGRAMS src/prbs_driver.py
+  DESTINATION ${CATKIN_PACKAGE_BIN_DESTINATION}
+)
+
+catkin_install_python(PROGRAMS src/mpc.py
+  DESTINATION ${CATKIN_PACKAGE_BIN_DESTINATION}
+)
+
+catkin_install_python(PROGRAMS src/publish_from_csv.py
+  DESTINATION ${CATKIN_PACKAGE_BIN_DESTINATION}
+)
+
+catkin_install_python(PROGRAMS src/odom_to_tf.py
+  DESTINATION ${CATKIN_PACKAGE_BIN_DESTINATION}
+)
+
+catkin_install_python(PROGRAMS src/estimate_delay.py
   DESTINATION ${CATKIN_PACKAGE_BIN_DESTINATION}
 )
