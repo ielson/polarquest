@@ -18,7 +18,10 @@ RUN apt-get update && apt-get install -y \
     ros-noetic-ros-controllers \
     ros-noetic-velodyne-simulator \
     neovim \
-    git 
+    git \
+    python3-pip
+
+RUN pip3 install gekko
 
 # making sure user is the same as mine so I can have autocomplete without problems
 RUN groupadd --gid "${USER_GID}" "${USERNAME}" \
@@ -34,6 +37,7 @@ RUN echo 'source "/opt/ros/$ROS_DISTRO/setup.bash"' >> /home/${USERNAME}/.bashrc
 
 USER ${USERNAME}
 WORKDIR /home/${USERNAME}/code/polarquest/ws
+COPY --chown=${USERNAME}:${USERNAME} init_ws.sh /usr/local/bin/init_ws.sh
+RUN chmod +x /usr/local/bin/init_ws.sh
 
-CMD ["bash"]
-
+CMD ["bash","-lc","/usr/local/bin/init_ws.sh"]

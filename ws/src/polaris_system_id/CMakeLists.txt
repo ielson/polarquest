@@ -211,9 +211,6 @@ include_directories(
 #add_executable(talker src/talker.cpp)
 #target_link_libraries(talker ${catkin_LIBRARIES})
 
-catkin_install_python(PROGRAMS src/prbs_driver.py
-  DESTINATION ${CATKIN_PACKAGE_BIN_DESTINATION}
-)
 
 catkin_install_python(PROGRAMS src/mpc.py
   DESTINATION ${CATKIN_PACKAGE_BIN_DESTINATION}
@@ -227,6 +224,6 @@ catkin_install_python(PROGRAMS src/odom_to_tf.py
   DESTINATION ${CATKIN_PACKAGE_BIN_DESTINATION}
 )
 
-catkin_install_python(PROGRAMS src/estimate_delay.py
+catkin_install_python(PROGRAMS src/driver.py
   DESTINATION ${CATKIN_PACKAGE_BIN_DESTINATION}
 )
