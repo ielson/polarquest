@@ -1,1 +1,8 @@
 ws/build
+ws/devel
+
+ws/src/polaris_system_id/src/__pycache__
+ws/src/polaris_system_id/src/analysis/checkpoints
+ws/src/polaris_system_id/src/analysis/.ipynb_checkpoints
+
+ws/.vscode
