@@ -1,0 +1,39 @@
+<!-- launch/gem_gazebo_rviz_all.launch -->
+<launch>
+  <arg name="use_sim_time" default="true"/>
+  <arg name="world_name"   default="$(find gem_gazebo)/worlds/simple_track_green.world"/>
+  <arg name="robot_name"   default="gem"/>
+
+  <!-- MPC parameters -->
+  <arg name="mode"           default="speed_steer"/>
+  <arg name="use_curv_speed" default="true"/>
+  <arg name="curv_gain"      default="6.0"/>
+  <arg name="spd_min"        default="0.5"/>
+  <arg name="spd_max"        default="8.0"/>
+  <arg name="spd_slew"       default="0.6"/>
+
+  <include file="$(find gem_gazebo)/launch/gem_gazebo_rviz.launch">
+    <arg name="use_rviz"     value="false"/>
+    <arg name="use_sim_time" value="$(arg use_sim_time)"/>
+    <arg name="world_name"   value="$(arg world_name)"/>
+    <arg name="robot_name"   value="$(arg robot_name)"/>
+  </include>
+
+  <group ns="$(arg robot_name)">
+    <node name="rviz_custom" pkg="rviz" type="rviz"
+          args="-d $(find polaris_system_id)/launch/gem_gazebo_rviz.rviz"
+          output="screen"/>
+  </group>
+
+  <node name="odom_to_tf" pkg="polaris_system_id" type="odom_to_tf.py" output="screen"/>
+  <node name="path_from_csv" pkg="polaris_system_id" type="publish_from_csv.py" output="screen"/>
+
+  <node name="mpc" pkg="polaris_system_id" type="mpc.py" output="screen">
+    <param name="~mode"           value="$(arg mode)"/>
+    <param name="~use_curv_speed" value="$(arg use_curv_speed)"/>
+    <param name="~curv_gain"      value="$(arg curv_gain)"/>
+    <param name="~spd_min"        value="$(arg spd_min)"/>
+    <param name="~spd_max"        value="$(arg spd_max)"/>
+    <param name="~spd_slew"       value="$(arg spd_slew)"/>
+  </node>
+</launch>
