@@ -65,7 +65,7 @@ if __name__ == "__main__":
 
     frame    = rospy.get_param("~frame_id", "world")
     topic_path = rospy.get_param("~topic_path", "/path_xy")                 # nav_msgs/Path
-    repeat   = rospy.get_param("~repeat", True)
+    repeat   = rospy.get_param("~repeat", False)
     rate_hz  = rospy.get_param("~rate_hz", 1.0)
     csv_path = rospy.get_param("~csv", "analysis/data/wps.csv")
 
