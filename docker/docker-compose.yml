@@ -15,10 +15,10 @@ services:
       - XDG_RUNTIME_DIR=/run/user/1000
       - DISPLAY=${DISPLAY}
       - QT_X11_NO_MITSHM=1
+      - LIBGL_DRI3_DISABLE=1
       - QT_QPA_PLATFORM=xcb 
-      - __GLX_VENDOR_LIBRARY_NAME=nvidia
       - NVIDIA_VISIBLE_DEVICES=all
-      - NVIDIA_DRIVER_CAPABILITIES=graphics,utility,compute
+      - NVIDIA_DRIVER_CAPABILITIES=all
     volumes:
       - /tmp/.X11-unix:/tmp/.X11-unix:rw
       - ${XAUTHORITY:-$HOME/.Xauthority}:/home/dev/.Xauthority:ro
