@@ -19,6 +19,7 @@ RUN apt-get update && apt-get install -y \
     ros-noetic-velodyne-simulator \
     neovim \
     git \
+    eog \
     python3-pip
 
 RUN pip3 install gekko
