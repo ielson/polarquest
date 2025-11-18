@@ -1,7 +1,7 @@
 <!-- launch/gem_gazebo_rviz_all.launch -->
 <launch>
   <arg name="use_sim_time" default="true"/>
-  <arg name="world_name"   default="$(find gem_gazebo)/worlds/simple_track_green.world"/>
+  <arg name="world_name"   default="$(find polaris_system_id)/worlds/infinite_track.world"/>
   <arg name="robot_name"   default="gem"/>
 
   <!-- MPC parameters -->
