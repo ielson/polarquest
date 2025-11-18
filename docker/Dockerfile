@@ -33,7 +33,12 @@ RUN groupadd --gid "${USER_GID}" "${USERNAME}" \
 
 # source ros default env and my env if available
 RUN echo 'source "/opt/ros/$ROS_DISTRO/setup.bash"' >> /home/${USERNAME}/.bashrc \
+ && echo 'source /usr/share/gazebo-11/setup.sh' >> /home/${USERNAME}/.bashrc \
  && echo '[ -f "$HOME/code/polarquest/ws/devel/setup.bash" ] && source "$HOME/code/polarquest/ws/devel/setup.bash"' >> /home/${USERNAME}/.bashrc \
+ && echo 'if [ -d "$HOME/code/polarquest/ws/src/POLARIS_GEM_e2/polaris_gem_simulator/gem_simulator/gem_gazebo" ]; then' >> /home/${USERNAME}/.bashrc \
+ && echo '  export GAZEBO_MODEL_PATH=$HOME/code/polarquest/ws/src/POLARIS_GEM_e2/polaris_gem_simulator/gem_simulator/gem_gazebo/models:$GAZEBO_MODEL_PATH' >> /home/${USERNAME}/.bashrc \
+ && echo '  export GAZEBO_RESOURCE_PATH=$HOME/code/polarquest/ws/src/POLARIS_GEM_e2/polaris_gem_simulator/gem_simulator/gem_gazebo:$GAZEBO_RESOURCE_PATH' >> /home/${USERNAME}/.bashrc \
+ && echo 'fi' >> /home/${USERNAME}/.bashrc \ 
  && chown ${USER_UID}:${USER_GID} /home/${USERNAME}/.bashrc
 
 USER ${USERNAME}
