@@ -1,7 +1,8 @@
-# Polarquest - a Polaris GEM System ID and MPC control ROS Package
+# Polarquest - ROS-Based System Identification & Model Validation for Autonomous Vehicle
 
-A compact ROS stack to **simulate the [Polaris GEM vehicle](https://gitlab.engr.illinois.edu/gemillins/POLARIS_GEM_e2)**, publish paths from CSV files, and run a **Model Predictive Controller (MPC)** built from the **identified vehicle dynamics**.  
+> A compact ROS stack to **use data drive system identification for the [Polaris GEM vehicle](https://gitlab.engr.illinois.edu/gemillins/POLARIS_GEM_e2)**, publish paths from CSV files, and run a **Model Predictive Controller (MPC)** built from the **identified vehicle dynamics**.  
 Everything runs inside a **Docker** environment with optional NVIDIA GPU acceleration.
+![polarquest_demo](https://github.com/user-attachments/assets/2af737ff-5a52-4d09-8e55-ff1ebdf94873)
 
 ---
 
@@ -20,6 +21,55 @@ A rendered PDF version is also provided for convenience:
 
 ---
 
+## Why This Project Matters?
+
+This project implements a full ROS-based system identification and validation pipeline for a Polaris GEM vehicle.
+The goal is to:
+- Collect vehicle data using ROS
+- Identify a physics-consistent dynamic model
+- Validate the model against real-world recordings
+- Quantify performance using cross-track error (CTE)
+- Prepare the model for MPC-based trajectory tracking
+
+## System Architecture
+
+```mermaid
+flowchart LR
+    subgraph ROS Ecosystem
+        A[Ackermann Msg]
+        B[Odom]
+        D[rosbag Recording]
+    end
+
+    subgraph ROS Ecosystem
+        F[MPC Controller]
+        G[Ackermann Msg]
+    end
+
+    A --> D
+    B --> D
+
+    D --> E[System Identification Notebook]
+    E --|Identified Paramenters|--> F
+    
+    F --> G
+    G --> H[Cross-Track Error Analysis]
+```
+
+---
+
+## Validation Results
+
+### Model vs Real Pose Tracking (x, y, ψ)
+<img width="890" height="1597" alt="image(2)" src="https://github.com/user-attachments/assets/9187c903-58ea-4aa7-989c-1b08db2e6389" />
+
+The identified model closely follows the recorded vehicle dynamics.
+
+### Cross-Track Error (CTE)
+<img width="1350" height="600" alt="image" src="https://github.com/user-attachments/assets/c197ee74-ac38-4f9e-8a40-ba40e777f4a1" />
+
+
+Final RMSE: **0.337 m**
 
 <details> <summary><b>Installation (Docker +  NVIDIA container toolkit)</b></summary>
 
