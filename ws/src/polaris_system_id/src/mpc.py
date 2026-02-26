@@ -11,7 +11,7 @@ import numpy as np
 
 import rospy
 from nav_msgs.msg import Odometry, Path
-from ackermann_msgs.msg import AckermannDrive
+from ackermann_msgs.msg import AckermannDriveStamped
 from tf.transformations import euler_from_quaternion
 
 from gekko import GEKKO
@@ -55,8 +55,8 @@ def pad_slice(a, i0, n):
 
 def mpc_xypsi(t, pars, x_ref, y_ref, psi_ref, v_ref,
               Ts=None, Np=20, mode='steer_only',
-              steer_bounds=(-0.6,0.6), dmax_steer=0.20,
-              spd_bounds=(0.0,8.0), dmax_spd=0.6,
+              steer_bounds=(-0.25,0.25), dmax_steer=0.20,
+              spd_bounds=(0.0,1.0), dmax_spd=0.6,
               w_pos=1.0, w_yaw=0.3, w_v=0.2,
               w_u_steer=1e-6, w_u_spd=1e-6):
     """
@@ -242,8 +242,8 @@ class MPCNode:
         self.u_spd_hold = self.v_fixed
 
         # --- ROS I/O ---
-        self.pub = rospy.Publisher('/gem/ackermann_cmd', AckermannDrive, queue_size=1)
-        rospy.Subscriber('/gem/base_footprint/odom', Odometry, self.cb_odom, queue_size=1)
+        self.pub = rospy.Publisher('/car_like/ackermann_cmd', AckermannDriveStamped, queue_size=1)
+        rospy.Subscriber('/car_like/odom', Odometry, self.cb_odom, queue_size=1)
         rospy.Subscriber('/path_xy', Path, self.cb_path, queue_size=1)
 
         self.metrics = CTEMetrics(
@@ -251,7 +251,7 @@ class MPCNode:
             signed=True
         )
 
-        rospy.loginfo(f"[MPC] Node ready (mode={self.mode}). Publishing /gem/ackermann_cmd")
+        rospy.loginfo(f"[MPC] Node ready (mode={self.mode}). Publishing /car_like/ackermann_cmd")
 
     # --------------- Callbacks --------------- #
     def cb_odom(self, msg: Odometry):
@@ -329,11 +329,12 @@ class MPCNode:
             r.sleep()
 
     def publish_cmd(self, delta, speed):
-        msg = AckermannDrive()
-        msg.steering_angle = float(np.clip(delta,
+        msg = AckermannDriveStamped()
+        msg.header.stamp = rospy.Time.now()
+        msg.drive.steering_angle = float(np.clip(delta,
                                 -math.radians(self.steer_deg),
                                  math.radians(self.steer_deg)))
-        msg.speed = float(speed)
+        msg.drive.speed = float(speed)
         self.pub.publish(msg)
 
 

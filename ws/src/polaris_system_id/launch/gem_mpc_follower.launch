@@ -33,6 +33,8 @@
   <node name="odom_to_tf" pkg="polaris_system_id" type="odom_to_tf.py" output="screen"/>
   <node name="path_from_csv" pkg="polaris_system_id" type="publish_from_csv.py" output="screen"/>
 
+  <node name="car_like_ackermann" pkg="car_like_description" type="car_like_v_angle_controller.py" output="screen"/>
+
   <node name="mpc" pkg="polaris_system_id" type="mpc.py" output="screen">
     <param name="~mode"           value="$(arg mode)"/>
     <param name="~use_curv_speed" value="$(arg use_curv_speed)"/>

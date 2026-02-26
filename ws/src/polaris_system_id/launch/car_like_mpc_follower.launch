@@ -1,0 +1,106 @@
+<launch>
+  <arg name="paused" default="false"/>
+  <arg name="gui" default="true"/>
+  <arg name="use_sim_time" default="true"/>
+  <arg name="verbose" default="false"/>
+  <arg name="ns" default="car_like"/>
+
+  <arg name="wheelbase" default="0.16"/>
+  <arg name="track" default="0.13"/>
+  <arg name="wheel_radius" default="0.0315"/>
+  <arg name="max_steer" default="0.7"/>
+  <arg name="max_speed" default="2.0"/>
+
+  <!-- MPC parameters -->
+  <arg name="mode"           default="speed_steer"/>
+  <arg name="use_curv_speed" default="true"/>
+  <arg name="curv_gain"      default="6.0"/>
+  <arg name="spd_min"        default="0.5"/>
+  <arg name="spd_max"        default="8.0"/>
+  <arg name="spd_slew"       default="0.6"/>
+
+  <param name="use_sim_time" value="$(arg use_sim_time)"/>
+  <arg name="world_name" default="$(find gem_gazebo)/worlds/simple_track_green.world"/>
+
+  <!-- robot_description global pro gazebo -->
+  <param name="robot_description"
+         command="$(find xacro)/xacro --inorder '$(find car_like_description)/urdf/car_like.urdf.xacro' ns:=$(arg ns)"/>
+
+  <rosparam file="$(find car_like_description)/config/controllers.yaml"
+            command="load" ns="$(arg ns)"/>
+
+  <arg name="x" default="33.4"/>
+  <arg name="y" default="-62.9"/>
+  <arg name="z" default="0.5"/>
+  <arg name="yaw" default="-1.5707"/>
+
+  <include file="$(find gazebo_ros)/launch/empty_world.launch">
+    <arg name="paused" value="$(arg paused)"/>
+    <arg name="gui" value="$(arg gui)"/>
+    <arg name="verbose" value="$(arg verbose)"/>
+    <arg name="world_name" value="$(arg world_name)"/>
+  </include>
+
+  <group ns="$(arg ns)">
+
+    <node pkg="robot_state_publisher" type="robot_state_publisher"
+          name="robot_state_publisher" output="screen"/>
+
+    <node pkg="gazebo_ros" type="spawn_model" name="spawn_car_like" output="screen"
+          args="-urdf -param /robot_description -model $(arg ns) -x $(arg x) -y $(arg y) -z $(arg z) -y $(arg yaw)"/>
+
+    <node pkg="controller_manager" type="spawner" name="controller_spawner" output="screen"
+      args="--namespace /$(arg ns)
+            --timeout 60
+            joint_state_controller
+            front_left_steer_controller
+            front_right_steer_controller
+            rear_left_wheel_controller
+            rear_right_wheel_controller"/>
+
+
+    <node pkg="car_like_description" type="car_like_v_angle_controller.py"
+          name="v_angle_controller" output="screen">
+      <param name="wheelbase" value="$(arg wheelbase)"/>
+      <param name="track" value="$(arg track)"/>
+      <param name="wheel_radius" value="$(arg wheel_radius)"/>
+      <param name="max_steer" value="$(arg max_steer)"/>
+      <param name="max_speed" value="$(arg max_speed)"/>
+    </node>
+
+    <!-- ODOM: publica /car_like/odom (sem TF) -->
+    <node pkg="car_like_description" type="car_like_odometry_node.py"
+          name="car_like_odometry" output="screen">
+      <param name="wheel_radius" value="$(arg wheel_radius)"/>
+      <param name="wheelbase" value="$(arg wheelbase)"/>
+
+      <!-- ✅ SEM TF (EKF publica) -->
+      <param name="publish_tf" value="false"/>
+
+      <param name="odom_topic" value="odom"/>
+
+      <param name="rear_left_sign" value="-1.0"/>
+      <param name="rear_right_sign" value="-1.0"/>
+    </node>
+
+    <!-- EKF: assina "odom" (relativo) e publica odom_filtered + TF -->
+    <node pkg="robot_localization" type="ekf_localization_node" name="ekf" output="screen" clear_params="true">
+      <rosparam command="load" file="$(find car_like_description)/config/ekf.yaml"/>
+      <remap from="odometry/filtered" to="odom_filtered"/>
+    </node>
+
+    <node name="car_like_ackermann" pkg="car_like_description" type="car_like_v_angle_controller.py" output="screen"/>
+    <node name="path_from_csv" pkg="polaris_system_id" type="publish_from_csv.py" output="screen"/>
+
+    <node name="mpc" pkg="polaris_system_id" type="mpc.py" output="screen">
+      <param name="~mode"           value="$(arg mode)"/>
+      <param name="~use_curv_speed" value="$(arg use_curv_speed)"/>
+      <param name="~curv_gain"      value="$(arg curv_gain)"/>
+      <param name="~spd_min"        value="$(arg spd_min)"/>
+      <param name="~spd_max"        value="$(arg spd_max)"/>
+      <param name="~spd_slew"       value="$(arg spd_slew)"/>
+    </node>
+
+  </group>
+</launch>
+
