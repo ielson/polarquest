@@ -1,0 +1,11 @@
+# Parameter set used by the currently attached mpc.py.
+# Use this file only if these are the parameters that produced the paper's
+# closed-loop results, or update the paper to match the final chosen set.
+tau_acc: 0.85716492375
+tau_str: 0.4119392892
+tau_v: 0.43809159234
+L_eff: 2.8168931892
+k_del: 1.666545649
+k_b1: 0.6
+k_b3: 1.0
+psi_bias: -0.020810914222

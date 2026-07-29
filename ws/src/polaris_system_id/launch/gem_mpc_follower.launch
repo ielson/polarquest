@@ -18,10 +18,10 @@
     <arg name="world_name"   value="$(arg world_name)"/>
     <arg name="robot_name"   value="$(arg robot_name)"/>
     <!-- pose inicial do GEM em cima da pista -->
-    <arg name="x"   value="33.4"/>
-    <arg name="y"   value="-92.9"/>
+    <arg name="x"   value="34.597002"/>
+    <arg name="y"   value="-93.948582"/>
     <arg name="z"   value="0.05"/>
-    <arg name="yaw" value="-0.7207"/>
+    <arg name="yaw" value="-0.718520"/>
   </include>
 
   <group ns="$(arg robot_name)">

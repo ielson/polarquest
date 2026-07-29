@@ -1,0 +1,12 @@
+# Later parameter set shown in the system-identification notebook together
+# with the reported open-loop errors (~0.18 m/s vx, 0.057 rad yaw, etc.).
+# Several estimates are on parameter bounds; validate on held-out data before
+# selecting this as the final controller model.
+tau_acc: 0.053690972223
+tau_str: 0.36371978163
+tau_v: 1.2296913679
+L_eff: 1.0
+k_del: 0.594227598
+k_b1: 0.6
+k_b3: 1.0
+psi_bias: -0.014286499961

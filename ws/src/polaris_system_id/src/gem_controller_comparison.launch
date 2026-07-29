@@ -1,0 +1,66 @@
+<?xml version="1.0"?>
+<launch>
+  <!-- Experiment selection -->
+  <arg name="controller" default="greybox_mpc"/>
+  <arg name="scenario" default="nominal"/>
+  <arg name="repeat" default="1"/>
+  <arg name="run_id" default="$(arg scenario)_r$(arg repeat)"/>
+
+  <!-- Files -->
+  <arg name="common_config"
+       default="$(find polaris_system_id)/config/comparison_common.yaml"/>
+  <arg name="model_config"
+       default="$(find polaris_system_id)/config/greybox_current_node.yaml"/>
+  <arg name="world_name"
+       default="$(find polaris_system_id)/worlds/infinite_track.world"/>
+
+  <!-- Simulation -->
+  <arg name="use_sim_time" default="true"/>
+  <arg name="robot_name" default="gem"/>
+  <arg name="gui" default="true"/>
+  <arg name="rviz" default="true"/>
+
+  <!-- Initial pose: nominal values from the working launch -->
+  <arg name="x" default="34.597002"/>
+  <arg name="y" default="-93.948582"/>
+  <arg name="z" default="0.05"/>
+  <arg name="yaw" default="-0.718520"/>
+
+  <include file="$(find gem_gazebo)/launch/gem_gazebo_rviz.launch">
+    <arg name="use_rviz" value="false"/>
+    <arg name="use_sim_time" value="$(arg use_sim_time)"/>
+    <arg name="world_name" value="$(arg world_name)"/>
+    <arg name="robot_name" value="$(arg robot_name)"/>
+    <arg name="gui" value="$(arg gui)"/>
+    <arg name="x" value="$(arg x)"/>
+    <arg name="y" value="$(arg y)"/>
+    <arg name="z" value="$(arg z)"/>
+    <arg name="yaw" value="$(arg yaw)"/>
+  </include>
+
+  <group ns="$(arg robot_name)">
+    <node if="$(arg rviz)" name="rviz_custom" pkg="rviz" type="rviz"
+          args="-d $(find polaris_system_id)/launch/gem_gazebo_rviz.rviz"
+          output="screen"/>
+  </group>
+
+  <!-- Reuse the exact state and path publishers used by the existing setup. -->
+  <node name="odom_to_tf" pkg="polaris_system_id" type="odom_to_tf.py"
+        output="screen"/>
+  <node name="path_from_csv" pkg="polaris_system_id" type="publish_from_csv.py"
+        output="screen"/>
+
+  <!-- required=true makes roslaunch stop Gazebo when the experiment finishes. -->
+  <node name="path_tracking_experiment"
+        pkg="polaris_system_id"
+        type="path_tracking_experiment.py"
+        output="screen"
+        required="true">
+    <rosparam command="load" file="$(arg common_config)"/>
+    <rosparam command="load" file="$(arg model_config)"/>
+    <param name="controller" value="$(arg controller)"/>
+    <param name="scenario" value="$(arg scenario)"/>
+    <param name="repeat" value="$(arg repeat)"/>
+    <param name="run_id" value="$(arg run_id)"/>
+  </node>
+</launch>

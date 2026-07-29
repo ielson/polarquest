@@ -1,0 +1,21 @@
+model_type: effective_curvature_first_order
+identification_sample_time_s: 0.01999999999998181
+speed:
+  tau_v: 1.5580303592291165
+  gain_v: 1.0086749755209905
+  bias_v: -0.005769607411966023
+  delay_steps: 4
+  delay_s: 0.0799999999999983
+curvature:
+  model: dynamic_linear
+  tau_kappa: 0.6012253028518952
+  a1: 0.6007225376271349
+  a3: 0.0
+  delay_steps: 0
+  delay_s: 0.0
+sideslip:
+  enabled: false
+  b0: 0.0
+  b1: 0.0
+  b3: 0.0
+  validation_improvement: 0.0070452698420089685

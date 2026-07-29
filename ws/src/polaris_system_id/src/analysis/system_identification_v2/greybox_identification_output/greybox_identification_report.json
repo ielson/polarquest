@@ -1,0 +1,83 @@
+{
+  "audit": [
+    {
+      "dataset": "speed",
+      "samples": 14346,
+      "duration_s": 286.8999999999939,
+      "sample_rate_hz": 50.000000000001066,
+      "body_speed_min": -4.3781890894870426,
+      "body_speed_max": 7.044210932078125,
+      "steering_min_deg": 0.0,
+      "steering_max_deg": 0.0,
+      "forward_samples_over_threshold": 5599
+    },
+    {
+      "dataset": "steering",
+      "samples": 44461,
+      "duration_s": 889.199999999981,
+      "sample_rate_hz": 50.000000000045475,
+      "body_speed_min": -6.906654777593907,
+      "body_speed_max": 5.641424692162772,
+      "steering_min_deg": -28.71455581793507,
+      "steering_max_deg": 36.863586214785585,
+      "forward_samples_over_threshold": 16823
+    }
+  ],
+  "speed_model": {
+    "tau_v": 1.5580303592291165,
+    "gain_v": 1.0086749755209905,
+    "bias_v": -0.005769607411966023,
+    "delay_steps_v": 4,
+    "delay_s_v": 0.0799999999999983,
+    "train_rmse": 0.10542064775280068,
+    "validation_rmse": 0.11655877675602137,
+    "test_rmse": 0.21897958482348973
+  },
+  "curvature_model": {
+    "model": "dynamic_linear",
+    "dynamic": true,
+    "cubic": false,
+    "tau_kappa": 0.6012253028518952,
+    "a1": 0.6007225376271349,
+    "a3": 0.0,
+    "delay_steps": 0,
+    "delay_s": 0.0,
+    "parameter_count": 2,
+    "train_yaw_rate_rmse": 0.027523872790396274,
+    "validation_yaw_rate_rmse": 0.04714616129794715,
+    "test_yaw_rate_rmse": 0.03185435381663606
+  },
+  "sideslip": {
+    "b0": -3.97792615342939e-05,
+    "b1": 0.00039211792966741606,
+    "b3": 0.0044888643602253595,
+    "zero_validation_rmse": 0.0004756186100993859,
+    "fitted_validation_rmse": 0.0004722677486493545,
+    "zero_test_rmse": 0.0003503137331154867,
+    "fitted_test_rmse": 0.0003485681307845695,
+    "validation_improvement": 0.0070452698420089685,
+    "enabled": false
+  },
+  "horizon_evaluation": [
+    {
+      "horizon_s": 1.0,
+      "windows": 174,
+      "grey_position_rmse": 0.047782248370306694,
+      "kin_position_rmse": 0.03405066544677633,
+      "grey_yaw_rmse_deg": 1.1215710874430644,
+      "kin_yaw_rmse_deg": 3.0167097518214563
+    },
+    {
+      "horizon_s": 2.0,
+      "windows": 148,
+      "grey_position_rmse": 0.13136138236446282,
+      "kin_position_rmse": 0.05796123034922275,
+      "grey_yaw_rmse_deg": 1.92644681534425,
+      "kin_yaw_rmse_deg": 3.3041226211629615
+    }
+  ],
+  "files": {
+    "speed_csv": "/home/dev/code/polarquest/ws/src/polaris_system_id/src/analysis/data/speed_only_01.csv",
+    "steer_csv": "/home/dev/code/polarquest/ws/src/polaris_system_id/src/analysis/data/speed_steer_01.csv"
+  }
+}

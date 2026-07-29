@@ -1,0 +1,50 @@
+# Common experiment configuration. Keep these values identical for every
+# controller in the comparison. Tune on a separate calibration run, then lock.
+Ts: 0.05
+Np: 20
+solve_every: 1
+v_fixed: 5.0
+use_curv_speed: false
+curv_gain: 6.0
+spd_min: 0.5
+spd_max: 8.0
+
+# Physical / command constraints
+wheelbase: 1.75
+steer_limit_deg: 35.0
+steer_slew_deg_step: 12.0
+preview_points: 3
+
+# Shared MPC objective and GEKKO configuration
+w_contour: 2.0
+w_lag: 0.1
+w_yaw: 0.5
+w_steer: 1.0e-6
+mv_dcost: 1.0
+gekko_nodes: 2
+gekko_solver: 3
+max_iter: 120
+solver_tol: 1.0e-6
+acceptable_tol: 1.0e-4
+linear_solver: ma27
+
+# Classical-controller tuning. Lock after calibration.
+stanley_k: 1.0
+stanley_softening: 1.0
+stanley_cte_sign: -1.0
+pp_lookahead_base: 3.0
+pp_lookahead_gain: 0.5
+
+# Path matching and metrics
+search_back: 30
+search_forward: 500
+stop_at_path_end: true
+end_margin_points: 10
+max_run_time: 320.0
+max_abs_cte: 20.0
+metrics_transient_s: 5.0
+
+# Set to world only if the Odometry twist is expressed in the world frame.
+# The article currently describes it that way; verify with your GEM plugin.
+odom_twist_frame: world
+metrics_root: src/analysis/data/controller_comparison

@@ -1,9 +1,16 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-"""
-MPC ROS node.
-- Mode 'steer_only': controla apenas direção; velocidade é passada como perfil conhecido (constante por padrão).
-- Mode 'speed_steer': controla direção e velocidade simultaneamente.
+"""Unified ROS path-tracking experiment node.
+
+Controllers:
+  - greybox_mpc: proposed steering-only nonlinear MPC with identified model
+  - kinematic_mpc: nominal kinematic-bicycle MPC with the same cost/constraints
+  - stanley: classical Stanley path-tracking controller
+  - pure_pursuit: optional classical geometric baseline
+
+All controllers consume the same odometry, path, speed profile, steering limits,
+control period, initial pose, and experiment logger. This is intended for a fair
+closed-loop comparison for the PolarQuest paper revision.
 """
 
 import math
