@@ -1,0 +1,16 @@
+# Effective curvature model identified from the recorded data.
+#
+# Longitudinal dynamics are intentionally kept compatible with the
+# successful legacy approximation. This isolates the lateral-model change.
+
+tau_acc: 0.05
+tau_v: 1.5580303592291165
+
+# kappa_dot = (a1 * delta + a3 * delta^3 - kappa) / tau_kappa
+tau_kappa: 0.6012253028518952
+kappa_a1: 0.6007225373
+kappa_a3: 0.0
+
+# Numerical/state-estimation limits.
+kappa_limit: 0.75
+kappa_min_speed: 0.5

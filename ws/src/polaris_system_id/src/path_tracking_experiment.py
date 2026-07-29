@@ -391,6 +391,7 @@ class GreyBoxMPC:
         y: float,
         yaw: float,
         speed_measured: float,
+        _yaw_rate_measured: float,
         x_ref: np.ndarray,
         y_ref: np.ndarray,
         psi_ref: np.ndarray,
@@ -435,6 +436,579 @@ class GreyBoxMPC:
         self.uva_est += self.Ts * (speed_cmd - self.uva_est) / max(p["tau_acc"], 1e-6)
         self.da_est += self.Ts * (steering_cmd - self.da_est) / max(p["tau_str"], 1e-6)
 
+
+class CurvatureGreyBoxMPC:
+    """Grey-box MPC using an identified effective-curvature state.
+
+    Identified lateral model:
+
+        kappa_dot =
+            (
+                a1 * delta
+                + a3 * delta**3
+                - kappa
+            ) / tau_kappa
+
+        psi_dot = v * kappa
+
+        x_dot = v * cos(psi)
+        y_dot = v * sin(psi)
+
+    The curvature dynamics represent the combined steering-actuator and
+    vehicle response identified from steering command to measured yaw rate.
+
+    The longitudinal model is intentionally kept equal to the successful
+    legacy approximation for the first comparison. This isolates the effect
+    of replacing the legacy da / tan(k_del * da) model with the directly
+    identified curvature model.
+    """
+
+    def __init__(
+        self,
+        config: Dict[str, float],
+    ) -> None:
+        self.Ts = float(config["Ts"])
+        self.Np = int(config["Np"])
+
+        self.steer_min = -float(
+            config["steer_limit_rad"]
+        )
+        self.steer_max = float(
+            config["steer_limit_rad"]
+        )
+        self.dmax = float(
+            config["steer_dmax_rad_step"]
+        )
+
+        self.pars = config[
+            "curvature_greybox"
+        ]
+
+        self.kappa_limit = float(
+            self.pars["kappa_limit"]
+        )
+        self.kappa_min_speed = float(
+            self.pars["kappa_min_speed"]
+        )
+
+        horizon = np.linspace(
+            0.0,
+            self.Np * self.Ts,
+            self.Np + 1,
+        )
+
+        zeros = np.zeros(
+            self.Np + 1,
+            dtype=float,
+        )
+
+        speed = np.full(
+            self.Np + 1,
+            float(config["v_fixed"]),
+            dtype=float,
+        )
+
+        self.m = GEKKO(remote=False)
+        self.m.time = horizon
+
+        self.m.options.IMODE = 6
+        self.m.options.NODES = int(
+            config["gekko_nodes"]
+        )
+        self.m.options.SOLVER = int(
+            config["gekko_solver"]
+        )
+        self.m.options.SCALING = 1
+        self.m.options.MAX_ITER = int(
+            config["max_iter"]
+        )
+
+        self.m.solver_options = [
+            "print_level 0",
+            (
+                "max_iter "
+                f"{int(config['max_iter'])}"
+            ),
+            f"tol {config['solver_tol']}",
+            (
+                "acceptable_tol "
+                f"{config['acceptable_tol']}"
+            ),
+        ]
+
+        linear_solver = str(
+            config.get(
+                "linear_solver",
+                "",
+            )
+        ).strip()
+
+        if linear_solver:
+            self.m.solver_options.append(
+                f"linear_solver {linear_solver}"
+            )
+
+        # ---------------------------------------------------------------
+        # Identified parameters
+        # ---------------------------------------------------------------
+
+        tau_acc = self.m.Param(
+            value=float(
+                self.pars["tau_acc"]
+            )
+        )
+
+        tau_v = self.m.Param(
+            value=float(
+                self.pars["tau_v"]
+            )
+        )
+
+        tau_kappa = self.m.Param(
+            value=float(
+                self.pars["tau_kappa"]
+            )
+        )
+
+        a1 = self.m.Param(
+            value=float(
+                self.pars["a1"]
+            )
+        )
+
+        a3 = self.m.Param(
+            value=float(
+                self.pars["a3"]
+            )
+        )
+
+        # ---------------------------------------------------------------
+        # Time-varying references
+        # ---------------------------------------------------------------
+
+        self.x_sp = self.m.Param(
+            value=zeros.copy()
+        )
+
+        self.y_sp = self.m.Param(
+            value=zeros.copy()
+        )
+
+        self.psi_sp = self.m.Param(
+            value=zeros.copy()
+        )
+
+        self.speed_sp = self.m.Param(
+            value=speed.copy()
+        )
+
+        # ---------------------------------------------------------------
+        # Predicted states
+        # ---------------------------------------------------------------
+
+        self.v = self.m.Var(
+            value=float(config["v_fixed"]),
+            lb=-10.0,
+            ub=10.0,
+        )
+
+        self.uva = self.m.Var(
+            value=float(config["v_fixed"]),
+            lb=-10.0,
+            ub=10.0,
+        )
+
+        self.kappa = self.m.Var(
+            value=0.0,
+            lb=-self.kappa_limit,
+            ub=self.kappa_limit,
+        )
+
+        self.psi = self.m.Var(
+            value=0.0
+        )
+
+        self.xg = self.m.Var(
+            value=0.0
+        )
+
+        self.yg = self.m.Var(
+            value=0.0
+        )
+
+        # ---------------------------------------------------------------
+        # Manipulated variable: steering command
+        # ---------------------------------------------------------------
+
+        self.delta = self.m.MV(
+            value=0.0,
+            lb=self.steer_min,
+            ub=self.steer_max,
+        )
+
+        self.delta.STATUS = 1
+        self.delta.DMAX = self.dmax
+        self.delta.DCOST = float(
+            config["mv_dcost"]
+        )
+
+        # ---------------------------------------------------------------
+        # Dynamic model
+        # ---------------------------------------------------------------
+
+        self.m.Equation(
+            self.uva.dt()
+            == (
+                self.speed_sp
+                - self.uva
+            ) / tau_acc
+        )
+
+        self.m.Equation(
+            self.v.dt()
+            == (
+                self.uva
+                - self.v
+            ) / tau_v
+        )
+
+        kappa_target = self.m.Intermediate(
+            a1 * self.delta
+            + a3 * self.delta**3
+        )
+
+        self.m.Equation(
+            self.kappa.dt()
+            == (
+                kappa_target
+                - self.kappa
+            ) / tau_kappa
+        )
+
+        self.m.Equation(
+            self.psi.dt()
+            == self.v * self.kappa
+        )
+
+        self.m.Equation(
+            self.xg.dt()
+            == self.v
+            * self.m.cos(
+                self.psi
+            )
+        )
+
+        self.m.Equation(
+            self.yg.dt()
+            == self.v
+            * self.m.sin(
+                self.psi
+            )
+        )
+
+        # ---------------------------------------------------------------
+        # Contouring cost
+        # ---------------------------------------------------------------
+
+        ex = self.m.Intermediate(
+            self.xg
+            - self.x_sp
+        )
+
+        ey = self.m.Intermediate(
+            self.yg
+            - self.y_sp
+        )
+
+        contour_error = self.m.Intermediate(
+            -self.m.sin(
+                self.psi_sp
+            ) * ex
+            + self.m.cos(
+                self.psi_sp
+            ) * ey
+        )
+
+        lag_error = self.m.Intermediate(
+            self.m.cos(
+                self.psi_sp
+            ) * ex
+            + self.m.sin(
+                self.psi_sp
+            ) * ey
+        )
+
+        heading_error = self.m.Intermediate(
+            self.psi
+            - self.psi_sp
+        )
+
+        self.m.Minimize(
+            float(config["w_contour"])
+            * contour_error**2
+        )
+
+        self.m.Minimize(
+            float(config["w_lag"])
+            * lag_error**2
+        )
+
+        self.m.Minimize(
+            float(config["w_yaw"])
+            * (
+                1.0
+                - self.m.cos(
+                    heading_error
+                )
+            )
+        )
+
+        self.m.Minimize(
+            float(config["w_steer"])
+            * self.delta**2
+        )
+
+        # ---------------------------------------------------------------
+        # State estimates and previous command
+        # ---------------------------------------------------------------
+
+        self.uva_est = float(
+            config["v_fixed"]
+        )
+
+        self.last_kappa = 0.0
+        self.last_delta = 0.0
+
+        # Keep the same solver behavior as the successful legacy model.
+        # delta.value is still explicitly initialized at every solve.
+        self.m.options.TIME_SHIFT = 1
+        self.m.options.WEB = 0
+
+    def initial_curvature(
+        self,
+        speed_measured: float,
+        yaw_rate_measured: float,
+    ) -> float:
+        """Estimate current curvature from measured yaw rate.
+
+        For planar motion:
+
+            kappa = yaw_rate / longitudinal_speed
+
+        At very low speed this quotient is unreliable, so the most recent
+        valid estimate is retained.
+        """
+
+        speed = float(
+            speed_measured
+        )
+
+        yaw_rate = float(
+            yaw_rate_measured
+        )
+
+        if (
+            np.isfinite(speed)
+            and np.isfinite(yaw_rate)
+            and abs(speed)
+            >= self.kappa_min_speed
+        ):
+            measured = (
+                yaw_rate
+                / speed
+            )
+
+            self.last_kappa = float(
+                np.clip(
+                    measured,
+                    -self.kappa_limit,
+                    self.kappa_limit,
+                )
+            )
+
+        return self.last_kappa
+
+    def solve(
+        self,
+        x: float,
+        y: float,
+        yaw: float,
+        speed_measured: float,
+        yaw_rate_measured: float,
+        x_ref: np.ndarray,
+        y_ref: np.ndarray,
+        psi_ref: np.ndarray,
+        speed_ref: np.ndarray,
+    ) -> Tuple[float, bool]:
+        psi_shift = (
+            round(
+                (
+                    yaw
+                    - float(
+                        psi_ref[0]
+                    )
+                )
+                / (
+                    2.0
+                    * math.pi
+                )
+            )
+            * 2.0
+            * math.pi
+        )
+
+        psi_aligned = (
+            psi_ref
+            + psi_shift
+        )
+
+        self.x_sp.value = (
+            x_ref.tolist()
+        )
+
+        self.y_sp.value = (
+            y_ref.tolist()
+        )
+
+        self.psi_sp.value = (
+            psi_aligned.tolist()
+        )
+
+        self.speed_sp.value = (
+            speed_ref.tolist()
+        )
+
+        # Measured initial conditions.
+        self.v.value = float(
+            speed_measured
+        )
+
+        self.psi.value = float(
+            yaw
+        )
+
+        self.xg.value = float(
+            x
+        )
+
+        self.yg.value = float(
+            y
+        )
+
+        self.uva.value = float(
+            self.uva_est
+        )
+
+        kappa_initial = (
+            self.initial_curvature(
+                speed_measured,
+                yaw_rate_measured,
+            )
+        )
+
+        self.kappa.value = float(
+            kappa_initial
+        )
+
+        # Use the same explicit initial steering profile used by the other
+        # MPCs. Do not wrap this in first_solve.
+        preview_idx = min(
+            5,
+            self.Np,
+        )
+
+        guess = np.clip(
+            wrap_angle(
+                float(
+                    psi_aligned[
+                        preview_idx
+                    ]
+                )
+                - yaw
+            ),
+            self.steer_min,
+            self.steer_max,
+        )
+
+        self.delta.value = [
+            float(guess)
+        ] * (
+            self.Np + 1
+        )
+
+        try:
+            self.m.solve(
+                disp=False
+            )
+
+            success = (
+                int(
+                    self.m.options.APPSTATUS
+                )
+                == 1
+            )
+
+            if success:
+                delta = float(
+                    self.delta.NEWVAL
+                )
+            else:
+                delta = (
+                    self.last_delta
+                )
+
+        except Exception as exc:
+            rospy.logwarn_throttle(
+                2.0,
+                (
+                    "Curvature grey-box "
+                    "MPC solve failed: %s"
+                ),
+                exc,
+            )
+
+            success = False
+            delta = self.last_delta
+
+        self.last_delta = float(
+            np.clip(
+                delta,
+                self.steer_min,
+                self.steer_max,
+            )
+        )
+
+        return (
+            self.last_delta,
+            success,
+        )
+
+    def update_actuator_estimates(
+        self,
+        speed_cmd: float,
+        _steering_cmd: float,
+    ) -> None:
+        """Update only the unmeasured longitudinal actuator state.
+
+        Curvature itself is reinitialized from measured yaw rate before
+        every optimization.
+        """
+
+        tau_acc = max(
+            float(
+                self.pars["tau_acc"]
+            ),
+            1e-6,
+        )
+
+        self.uva_est += (
+            self.Ts
+            * (
+                float(speed_cmd)
+                - self.uva_est
+            )
+            / tau_acc
+        )
 
 class KinematicMPC:
     """Nominal bicycle MPC without empirical slip, bias, gain, or actuator lags."""
@@ -544,6 +1118,7 @@ class KinematicMPC:
         y: float,
         yaw: float,
         _speed_measured: float,
+        _yaw_rate_measured: float,
         x_ref: np.ndarray,
         y_ref: np.ndarray,
         psi_ref: np.ndarray,
@@ -754,7 +1329,7 @@ class ExperimentLogger:
 class PathTrackingExperimentNode:
     def __init__(self) -> None:
         self.controller_name = str(rospy.get_param("~controller", "greybox_mpc"))
-        allowed = {"greybox_mpc", "kinematic_mpc", "stanley", "pure_pursuit"}
+        allowed = {"greybox_mpc", "curvature_greybox_mpc", "kinematic_mpc", "stanley", "pure_pursuit"}
         if self.controller_name not in allowed:
             raise ValueError(f"Unsupported controller '{self.controller_name}'. Choose one of {sorted(allowed)}")
 
@@ -804,6 +1379,57 @@ class PathTrackingExperimentNode:
             "psi_bias": float(rospy.get_param("~psi_bias", -0.020810914222)),
         }
 
+        self.curvature_greybox = {
+            "tau_acc": float(
+                rospy.get_param(
+                    "~tau_acc",
+                    0.05,
+                )
+            ),
+
+            "tau_v": float(
+                rospy.get_param(
+                    "~tau_v",
+                    1.5580303592291165,
+                )
+            ),
+
+            "tau_kappa": float(
+                rospy.get_param(
+                    "~tau_kappa",
+                    0.6012253028518952,
+                )
+            ),
+
+            "a1": float(
+                rospy.get_param(
+                    "~kappa_a1",
+                    0.6007225373,
+                )
+            ),
+
+            "a3": float(
+                rospy.get_param(
+                    "~kappa_a3",
+                    0.0,
+                )
+            ),
+
+            "kappa_limit": float(
+                rospy.get_param(
+                    "~kappa_limit",
+                    0.75,
+                )
+            ),
+
+            "kappa_min_speed": float(
+                rospy.get_param(
+                    "~kappa_min_speed",
+                    0.5,
+                )
+            ),
+        }
+
         self.stanley_k = float(rospy.get_param("~stanley_k", 1.0))
         self.stanley_softening = float(rospy.get_param("~stanley_softening", 1.0))
         self.stanley_cte_sign = float(rospy.get_param("~stanley_cte_sign", -1.0))
@@ -834,6 +1460,7 @@ class PathTrackingExperimentNode:
             "acceptable_tol": float(rospy.get_param("~acceptable_tol", 1e-4)),
             "linear_solver": str(rospy.get_param("~linear_solver", "ma27")),
             "greybox": self.greybox,
+            "curvature_greybox": self.curvature_greybox,
             "stanley_k": self.stanley_k,
             "stanley_softening": self.stanley_softening,
             "pp_lookahead_base": self.pp_lookahead_base,
@@ -865,6 +1492,7 @@ class PathTrackingExperimentNode:
         self.y = 0.0
         self.yaw = 0.0
         self.speed_measured = 0.0
+        self.yaw_rate_measured = 0.0
         self.run_start_sim: Optional[float] = None
         self.last_steering = 0.0
         self.last_speed = self.v_fixed
@@ -882,6 +1510,8 @@ class PathTrackingExperimentNode:
 
         if self.controller_name == "greybox_mpc":
             self.controller = GreyBoxMPC(self.config)
+        elif self.controller_name == "curvature_greybox_mpc":
+            self.controller = CurvatureGreyBoxMPC(self.config)
         elif self.controller_name == "kinematic_mpc":
             self.controller = KinematicMPC(self.config)
         else:
@@ -939,6 +1569,7 @@ class PathTrackingExperimentNode:
         yaw = self.yaw_unwrapper.update(yaw_raw)
         vx = float(msg.twist.twist.linear.x)
         vy = float(msg.twist.twist.linear.y)
+        yaw_rate = float(msg.twist.twist.angular.z)
         if self.odom_twist_frame == "world":
             speed = vx * math.cos(yaw) + vy * math.sin(yaw)
         elif self.odom_twist_frame == "magnitude":
@@ -950,6 +1581,9 @@ class PathTrackingExperimentNode:
         self.y = float(position.y)
         self.yaw = float(yaw)
         self.speed_measured = float(speed)
+        self.have_odom = True
+        self.speed_measured = float(speed)
+        self.yaw_rate_measured = float(yaw_rate)
         self.have_odom = True
 
     def speed_at(self, index: int) -> float:
@@ -1037,7 +1671,7 @@ class PathTrackingExperimentNode:
             if should_compute:
                 did_compute = True
                 wall_start = time.perf_counter()
-                if self.controller_name in {"greybox_mpc", "kinematic_mpc"}:
+                if self.controller_name in {"greybox_mpc", "curvature_greybox_mpc", "kinematic_mpc"}:
                     assert self.controller is not None
                     (
                         x_ref,
@@ -1056,6 +1690,7 @@ class PathTrackingExperimentNode:
                         self.y,
                         self.yaw,
                         self.speed_measured,
+                        self.yaw_rate_measured,
                         x_ref,
                         y_ref,
                         psi_ref,
@@ -1103,6 +1738,13 @@ class PathTrackingExperimentNode:
                 <= self.end_margin_m
             )
 
+            if abs(self.speed_measured) >= 0.5:
+                kappa_measured = (
+                    self.yaw_rate_measured
+                    / self.speed_measured
+                )
+            else:
+                kappa_measured = 0.0
             self.logger.record({
                 "t": float(elapsed),
                 "x": self.x,
@@ -1123,6 +1765,8 @@ class PathTrackingExperimentNode:
                 "compute_time_ms": compute_time_ms,
                 "did_compute": bool(did_compute),
                 "controller_success": bool(success),
+                "yaw_rate_measured": (self.yaw_rate_measured),
+                "kappa_measured": float(kappa_measured),
             })
 
             timed_out = elapsed >= self.max_run_time
